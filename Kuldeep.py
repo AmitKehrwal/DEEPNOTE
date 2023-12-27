@@ -46,7 +46,7 @@ def main():
     number = 5
     meetingcode = "82725009687"
     passcode = "0"
-    sec = 60
+    sec = 90
     wait_time = sec * 60
     workers = []
 
