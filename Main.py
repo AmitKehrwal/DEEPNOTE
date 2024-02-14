@@ -55,8 +55,8 @@ async def start(name, user, wait_time, meetingcode, passcode):
 
 async def main():
     number = 10
-    meetingcode = "82770760919"
-    passcode = "468111"
+    meetingcode = "83447163005"
+    passcode = "112233"
 
     sec = 90
     wait_time = sec * 80
