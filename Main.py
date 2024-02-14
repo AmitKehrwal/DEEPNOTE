@@ -20,48 +20,43 @@ async def start(name, user, wait_time, meetingcode, passcode):
     # Apply pyppeteer-stealth to mimic a real browser
     await stealth(page)
 
-    await page.goto(f'https://zoom.us/wc/join/{meetingcode}')
+    await page.goto(f'http://app.zoom.us/wc/join/{meetingcode}')
+    await page.waitForXPath('//input[@type="text"]')
+    await asyncio.sleep(2)  # Wait a bit more after page load
+
+    # Type the user name
+    await page.type('input[type="text"]', user)
+    await asyncio.sleep(2)  # Wait a bit after typing user name
+
+    # Type the password
+    await page.type('input[type="password"]', passcode)
+    await asyncio.sleep(2)  # Wait a bit after typing password
+
+    # Click the "Join" button
+    join_button = await page.waitForXPath('//button[contains(@class,"preview-join-button")]')
+    await join_button.click()
+
+    print(f"{name} sleep for {wait_time} seconds ...")
+    await asyncio.sleep(wait_time)
 
     try:
-        await page.click('//button[@id="onetrust-accept-btn-handler"]', timeout=5000)
+        # Wait for and click on the "Join Audio by Computer" button
+        print(f"{name} waiting for 'Join Audio by Computer' button...")
+        await page.waitForXPath('//button[contains(@class,"join-audio-by-voip__join-btn")]')
+        mic_button = await page.Jx('//button[contains(@class,"join-audio-by-voip__join-btn")]')
+        await mic_button[0].click()
+        print(f"{name} clicked 'Join Audio by Computer' button.")
     except Exception as e:
-        pass
+        print(f"{name} failed to join audio by computer:", e)
 
-    try:
-        await page.click('//button[@id="wc_agree1"]', timeout=5000)
-    except Exception as e:
-        pass
-
-    try:
-        await page.waitForSelector('input[type="text"]', timeout=200000)
-        await page.type('input[type="text"]', user)
-        await page.type('input[type="password"]', passcode)
-        join_button = await page.waitForSelector('button.preview-join-button', timeout=200000)
-        await join_button.click()
-    except Exception as e:
-        pass
-
-    try:
-        await page.waitForSelector('button[class*="join-audio-by-voip__join-btn"]', timeout=300000)
-        mic_button_locator = await page.querySelector('button[class*="join-audio-by-voip__join-btn"]')
-        await asyncio.sleep(5)
-        await mic_button_locator.click()
-        print(f"{name} mic aayenge.")
-    except Exception as e:
-        print(f"{name} mic nahe aayenge. ", e)
-
-    print(f"{user} sleep for {wait_time} seconds ...")
-    while running and wait_time > 0:
-        await asyncio.sleep(1)
-        wait_time -= 1
-    print(f"{user} ended!")
+    print(f"{name} ended!")
 
     await browser.close()
 
 async def main():
     number = 10
-    meetingcode = "82725009687"
-    passcode = "0"
+    meetingcode = "5551841610"
+    passcode = "112233"
 
     sec = 90
     wait_time = sec * 80
