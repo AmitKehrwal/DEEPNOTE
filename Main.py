@@ -1,76 +1,87 @@
-import time
-import threading
-import warnings
-from faker import Faker
-from playwright.sync_api import sync_playwright
+import asyncio
+import nest_asyncio
+from pyppeteer import launch
+from pyppeteer_stealth import stealth
+import indian_names  # Import the indian_names library
 
-warnings.filterwarnings('ignore')
-fake = Faker('en_IN')
-MUTEX = threading.Lock()
+nest_asyncio.apply()
 
-def sync_print(text):
-    with MUTEX:
-        print(text)
+running = True  # Define the 'running' variable
 
-def start(name, proxy, user, wait_time, meetingcode, passcode):
-    sync_print(f"{name} started!")
-    
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+async def start(name, user, wait_time, meetingcode, passcode):
+    print(f"{name} started!")
 
-        try:
-            page.goto(f'https://zoom.us/wc/join/{meetingcode}')
-            time.sleep(10)
+    browser = await launch(
+        headless=True,
+        args=['--no-sandbox', '--disable-dev-shm-usage']
+    )
+    page = await browser.newPage()
 
-            inp = page.locator('//input[@type="text"]')
-            inp.fill(f"{user}")
-            time.sleep(5)
+    # Apply pyppeteer-stealth to mimic a real browser
+    await stealth(page)
 
-            inp2 = page.locator('//input[@type="password"]')
-            inp2.fill(passcode)
+    await page.goto(f'https://zoom.us/wc/join/{meetingcode}')
 
-            # Click the "Join" button
-            join_button = page.locator('//button[contains(@class,"preview-join-button")]')
-            join_button.click()
+    try:
+        await page.click('//button[@id="onetrust-accept-btn-handler"]', timeout=5000)
+    except Exception as e:
+        pass
 
-            sync_print(f"{name} sleep for {wait_time} seconds ...")
-            time.sleep(wait_time)
-            sync_print(f"{name} ended!")
+    try:
+        await page.click('//button[@id="wc_agree1"]', timeout=5000)
+    except Exception as e:
+        pass
 
-        finally:
-            context.close()
+    try:
+        await page.waitForSelector('input[type="text"]', timeout=200000)
+        await page.type('input[type="text"]', user)
+        await page.type('input[type="password"]', passcode)
+        join_button = await page.waitForSelector('button.preview-join-button', timeout=200000)
+        await join_button.click()
+    except Exception as e:
+        pass
 
-def main():
-    number = 5
-    meetingcode = "82182310179"
-    passcode = "YFX"
+    try:
+        await page.waitForSelector('button[class*="join-audio-by-voip__join-btn"]', timeout=300000)
+        mic_button_locator = await page.querySelector('button[class*="join-audio-by-voip__join-btn"]')
+        await asyncio.sleep(5)
+        await mic_button_locator.click()
+        print(f"{name} mic aayenge.")
+    except Exception as e:
+        print(f"{name} mic nahe aayenge. ", e)
+
+    print(f"{user} sleep for {wait_time} seconds ...")
+    while running and wait_time > 0:
+        await asyncio.sleep(1)
+        wait_time -= 1
+    print(f"{user} ended!")
+
+    await browser.close()
+
+async def main():
+    number = 10
+    meetingcode = "82725009687"
+    passcode = "0"
+
     sec = 90
-    wait_time = sec * 60
-    workers = []
+    wait_time = sec * 80
+
+    loop = asyncio.get_event_loop()
+    tasks = []
 
     for i in range(number):
-        try:
-            proxy = proxylist[i]
-        except Exception:
-            proxy = None
-        try:
-            user = fake.name()
-        except IndexError:
-            break
-        wk = threading.Thread(target=start, args=(
-            f'[Thread{i}]', proxy, user, wait_time, meetingcode, passcode))
-        workers.append(wk)
+        user = indian_names.get_full_name()  # Generate a random Indian name
+        task = loop.create_task(start(f'[Thread{i}]', user, wait_time, meetingcode, passcode))
+        tasks.append(task)
 
-    for wk in workers:
-        wk.start()
-
-    for wk in workers:
-        wk.join()
+    try:
+        await asyncio.gather(*tasks)
+    except KeyboardInterrupt:
+        # Wait for tasks to complete
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
-        main()
-    except:
+        asyncio.run(main())
+    except KeyboardInterrupt:
         pass
